@@ -1,0 +1,15 @@
+/app/MftSearch/bin/Debug/net10.0/MftSearch
+/app/MftSearch/bin/Debug/net10.0/MftSearch.deps.json
+/app/MftSearch/bin/Debug/net10.0/MftSearch.runtimeconfig.json
+/app/MftSearch/bin/Debug/net10.0/MftSearch.dll
+/app/MftSearch/bin/Debug/net10.0/MftSearch.pdb
+/app/MftSearch/obj/Debug/net10.0/MftSearch.GeneratedMSBuildEditorConfig.editorconfig
+/app/MftSearch/obj/Debug/net10.0/MftSearch.AssemblyInfoInputs.cache
+/app/MftSearch/obj/Debug/net10.0/MftSearch.AssemblyInfo.cs
+/app/MftSearch/obj/Debug/net10.0/MftSearch.csproj.CoreCompileInputs.cache
+/app/MftSearch/obj/Debug/net10.0/MftSearch.sourcelink.json
+/app/MftSearch/obj/Debug/net10.0/MftSearch.dll
+/app/MftSearch/obj/Debug/net10.0/refint/MftSearch.dll
+/app/MftSearch/obj/Debug/net10.0/MftSearch.pdb
+/app/MftSearch/obj/Debug/net10.0/MftSearch.genruntimeconfig.cache
+/app/MftSearch/obj/Debug/net10.0/ref/MftSearch.dll
