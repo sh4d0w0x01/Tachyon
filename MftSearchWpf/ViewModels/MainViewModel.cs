@@ -13,8 +13,12 @@ namespace MftSearchWpf.ViewModels
 {
     public class MainViewModel : ViewModelBase
     {
+        // 1. Decouple the Data: Store millions of records here, NOT bound to UI
         private List<FileRecord> _allRecords = new List<FileRecord>();
+
+        // 2. Empty Start: This is bound to the DataGrid/ListView and starts completely empty
         private ObservableCollection<FileRecord> _filteredRecords = new ObservableCollection<FileRecord>();
+
         private string _searchQuery = string.Empty;
         private string _statusText = "Initializing...";
         private bool _isBusy = true;
@@ -71,13 +75,17 @@ namespace MftSearchWpf.ViewModels
 
             try
             {
+                // Background task builds the List<FileRecord>
                 _allRecords = await MftEngine.BuildIndexAsync();
 
                 sw.Stop();
                 StatusText = $"Indexed {_allRecords.Count:N0} files in {sw.ElapsedMilliseconds} ms. Ready.";
 
-                // Show initial empty view or everything
-                FilteredRecords = new ObservableCollection<FileRecord>();
+                // Ensure the UI collection remains empty on startup
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    FilteredRecords.Clear();
+                });
             }
             catch (Exception ex)
             {
@@ -101,28 +109,34 @@ namespace MftSearchWpf.ViewModels
 
             if (string.IsNullOrWhiteSpace(query))
             {
-                // Optionally clear or show all. With millions, probably better to clear.
-                FilteredRecords = new ObservableCollection<FileRecord>();
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    FilteredRecords.Clear();
+                });
                 return;
             }
 
             try
             {
-                // Run filter on background thread
+                // 3. Filter on Demand: Run filter on a background thread
                 var results = await Task.Run(() =>
                 {
                     return _allRecords
                         .Where(r => r.FileName.Contains(query, StringComparison.OrdinalIgnoreCase))
-                        .Take(500) // Limit UI rendering to top 500 for responsiveness
+                        .Take(200) // Take only the first 200 matches
                         .ToList();
                 }, token);
 
                 if (!token.IsCancellationRequested)
                 {
-                    // Update ObservableCollection on UI Thread
+                    // Push those 200 results into the ObservableCollection using the UI Dispatcher
                     Application.Current.Dispatcher.Invoke(() =>
                     {
-                        FilteredRecords = new ObservableCollection<FileRecord>(results);
+                        FilteredRecords.Clear();
+                        foreach (var record in results)
+                        {
+                            FilteredRecords.Add(record);
+                        }
                     });
                 }
             }
