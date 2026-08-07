@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:MftSearchWpf"
         xmlns:vm="clr-namespace:MftSearchWpf.ViewModels"
         mc:Ignorable="d"
-        Title="Everything WPF" Height="600" Width="900"
+        Title="Tachyon" Height="600" Width="900"
         Background="#1e1e1e" Foreground="White" WindowStartupLocation="CenterScreen">
 
     <Window.DataContext>
