@@ -208,9 +208,13 @@ namespace MftSearchWpf.Services
 
                             while (offset < bytesReturned)
                             {
+                                if (offset + 4 > bytesReturned) break;
+
                                 byte* recordPtr = ptr + offset;
                                 uint recordLength = *(uint*)recordPtr;
-                                if (recordLength == 0) break;
+
+                                if (recordLength < 60) break;
+                                if (offset + recordLength > bytesReturned) break;
 
                                 ushort majorVersion = *(ushort*)(recordPtr + 4);
 
@@ -220,6 +224,7 @@ namespace MftSearchWpf.Services
                                     ulong parentFrn = 0;
                                     ushort fileNameLength = 0;
                                     ushort fileNameOffset = 0;
+                                    bool validRecord = true;
 
                                     if (majorVersion == 2)
                                     {
@@ -230,21 +235,31 @@ namespace MftSearchWpf.Services
                                     }
                                     else if (majorVersion == 3)
                                     {
-                                        frn = *(ulong*)(recordPtr + 8);
-                                        parentFrn = *(ulong*)(recordPtr + 24);
-                                        fileNameLength = *(ushort*)(recordPtr + 72);
-                                        fileNameOffset = *(ushort*)(recordPtr + 74);
+                                        if (recordLength >= 76)
+                                        {
+                                            frn = *(ulong*)(recordPtr + 8);
+                                            parentFrn = *(ulong*)(recordPtr + 24);
+                                            fileNameLength = *(ushort*)(recordPtr + 72);
+                                            fileNameOffset = *(ushort*)(recordPtr + 74);
+                                        }
+                                        else
+                                        {
+                                            validRecord = false;
+                                        }
                                     }
 
-                                    // Fast string creation using ReadOnlySpan and unsafe code
-                                    var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
-                                    string fileName = new string(span);
-
-                                    index[frn] = new RawFileEntry
+                                    if (validRecord && fileNameOffset + fileNameLength <= recordLength)
                                     {
-                                        Name = fileName,
-                                        ParentFrn = parentFrn
-                                    };
+                                        // Fast string creation using ReadOnlySpan and unsafe code
+                                        var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
+                                        string fileName = new string(span);
+
+                                        index[frn] = new RawFileEntry
+                                        {
+                                            Name = fileName,
+                                            ParentFrn = parentFrn
+                                        };
+                                    }
                                 }
                                 offset += (int)recordLength;
                             }
