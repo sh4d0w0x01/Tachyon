@@ -10,4 +10,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\MftRecordParser.cs" Link="Shared\MftRecordParser.cs" />
+  </ItemGroup>
+
 </Project>

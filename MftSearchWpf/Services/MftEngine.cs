@@ -216,25 +216,13 @@ namespace MftSearchWpf.Services
 
                                 if (majorVersion == 2 || majorVersion == 3)
                                 {
-                                    ulong frn = 0;
-                                    ulong parentFrn = 0;
-                                    ushort fileNameLength = 0;
-                                    ushort fileNameOffset = 0;
-
-                                    if (majorVersion == 2)
-                                    {
-                                        frn = *(ulong*)(recordPtr + 8);
-                                        parentFrn = *(ulong*)(recordPtr + 16);
-                                        fileNameLength = *(ushort*)(recordPtr + 56);
-                                        fileNameOffset = *(ushort*)(recordPtr + 58);
-                                    }
-                                    else if (majorVersion == 3)
-                                    {
-                                        frn = *(ulong*)(recordPtr + 8);
-                                        parentFrn = *(ulong*)(recordPtr + 24);
-                                        fileNameLength = *(ushort*)(recordPtr + 72);
-                                        fileNameOffset = *(ushort*)(recordPtr + 74);
-                                    }
+                                    MftSearch.Shared.MftRecordParser.ParseRecordFields(
+                                        recordPtr,
+                                        majorVersion,
+                                        out ulong frn,
+                                        out ulong parentFrn,
+                                        out ushort fileNameLength,
+                                        out ushort fileNameOffset);
 
                                     // Fast string creation using ReadOnlySpan and unsafe code
                                     var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
