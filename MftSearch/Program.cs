@@ -269,50 +269,60 @@ namespace MftSearch
                         // Process the records in the buffer.
                         // Pointer math: Records begin at offset 8 (past the 8-byte nextStartFrn).
                         int offset = 8;
-                        while (offset < bytesReturned)
+                        while (offset + 4 <= bytesReturned)
                         {
                             IntPtr pRecord = new IntPtr(pBuffer.ToInt64() + offset);
 
-                            // Read RecordLength and MajorVersion
+                            // Read RecordLength
                             uint recordLength = (uint)Marshal.ReadInt32(pRecord);
-                            ushort majorVersion = (ushort)Marshal.ReadInt16(pRecord, 4);
 
-                            if (recordLength == 0) break; // Should not happen
+                            if (recordLength == 0 || offset + recordLength > bytesReturned) break; // Should not happen or buffer overflow
 
-                            if (majorVersion == 2 || majorVersion == 3)
+                            if (recordLength >= 6) // Ensure we can safely read MajorVersion
                             {
-                                ulong frn = 0;
-                                ulong parentFrn = 0;
-                                ushort fileNameLength = 0;
-                                ushort fileNameOffset = 0;
+                                ushort majorVersion = (ushort)Marshal.ReadInt16(pRecord, 4);
 
-                                // Parse fields depending on version (V2 for NTFS, V3 for ReFS)
-                                if (majorVersion == 2)
+                                if (majorVersion == 2 || majorVersion == 3)
                                 {
-                                    frn = (ulong)Marshal.ReadInt64(pRecord, 8);
-                                    parentFrn = (ulong)Marshal.ReadInt64(pRecord, 16);
-                                    fileNameLength = (ushort)Marshal.ReadInt16(pRecord, 56);
-                                    fileNameOffset = (ushort)Marshal.ReadInt16(pRecord, 58);
+                                    ulong frn = 0;
+                                    ulong parentFrn = 0;
+                                    ushort fileNameLength = 0;
+                                    ushort fileNameOffset = 0;
+                                    bool validRecord = false;
+
+                                    // Parse fields depending on version (V2 for NTFS, V3 for ReFS)
+                                    if (majorVersion == 2 && recordLength >= 60)
+                                    {
+                                        frn = (ulong)Marshal.ReadInt64(pRecord, 8);
+                                        parentFrn = (ulong)Marshal.ReadInt64(pRecord, 16);
+                                        fileNameLength = (ushort)Marshal.ReadInt16(pRecord, 56);
+                                        fileNameOffset = (ushort)Marshal.ReadInt16(pRecord, 58);
+                                        validRecord = true;
+                                    }
+                                    else if (majorVersion == 3 && recordLength >= 76)
+                                    {
+                                        // V3 uses 128-bit file references. We read the lower 64-bits.
+                                        frn = (ulong)Marshal.ReadInt64(pRecord, 8);
+                                        parentFrn = (ulong)Marshal.ReadInt64(pRecord, 24);
+                                        fileNameLength = (ushort)Marshal.ReadInt16(pRecord, 72);
+                                        fileNameOffset = (ushort)Marshal.ReadInt16(pRecord, 74);
+                                        validRecord = true;
+                                    }
+
+                                    if (validRecord && fileNameOffset + fileNameLength <= recordLength)
+                                    {
+                                        // Read the filename string from the buffer
+                                        IntPtr pFileName = new IntPtr(pRecord.ToInt64() + fileNameOffset);
+                                        string fileName = Marshal.PtrToStringUni(pFileName, fileNameLength / 2) ?? string.Empty;
+
+                                        // Add to dictionary map
+                                        index[frn] = new FileEntry
+                                        {
+                                            Name = fileName,
+                                            ParentFrn = parentFrn
+                                        };
+                                    }
                                 }
-                                else if (majorVersion == 3)
-                                {
-                                    // V3 uses 128-bit file references. We read the lower 64-bits.
-                                    frn = (ulong)Marshal.ReadInt64(pRecord, 8);
-                                    parentFrn = (ulong)Marshal.ReadInt64(pRecord, 24);
-                                    fileNameLength = (ushort)Marshal.ReadInt16(pRecord, 72);
-                                    fileNameOffset = (ushort)Marshal.ReadInt16(pRecord, 74);
-                                }
-
-                                // Read the filename string from the buffer
-                                IntPtr pFileName = new IntPtr(pRecord.ToInt64() + fileNameOffset);
-                                string fileName = Marshal.PtrToStringUni(pFileName, fileNameLength / 2) ?? string.Empty;
-
-                                // Add to dictionary map
-                                index[frn] = new FileEntry
-                                {
-                                    Name = fileName,
-                                    ParentFrn = parentFrn
-                                };
                             }
 
                             offset += (int)recordLength;
