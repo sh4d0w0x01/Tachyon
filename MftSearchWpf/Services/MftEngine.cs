@@ -73,16 +73,14 @@ namespace MftSearchWpf.Services
             public string Name;
         }
 
-        public static bool IsAdministrator()
+        public static bool IsAdministrator(ISystemIdentity? identity = null)
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            var systemIdentity = identity ?? new SystemIdentity();
+
+            if (!systemIdentity.IsWindowsOS())
                 return false;
 
-#pragma warning disable CA1416
-            using WindowsIdentity identity = WindowsIdentity.GetCurrent();
-            WindowsPrincipal principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-#pragma warning restore CA1416
+            return systemIdentity.IsAdministratorRole();
         }
 
         public static async Task<List<Models.FileRecord>> BuildIndexAsync()
