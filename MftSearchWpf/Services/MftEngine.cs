@@ -217,16 +217,30 @@ namespace MftSearchWpf.Services
 
                                     if (majorVersion == 2 || majorVersion == 3)
                                     {
-                                        bool validRecord = MftSearch.Shared.MftRecordParser.ParseRecordFields(
-                                            recordPtr,
-                                            recordLength,
-                                            majorVersion,
-                                            out ulong frn,
-                                            out ulong parentFrn,
-                                            out ushort fileNameLength,
-                                            out ushort fileNameOffset);
+                                        ulong frn = 0;
+                                        ulong parentFrn = 0;
+                                        ushort fileNameLength = 0;
+                                        ushort fileNameOffset = 0;
+                                        bool validRecord = false;
 
-                                        if (validRecord)
+                                        if (majorVersion == 2 && recordLength >= 60)
+                                        {
+                                            frn = *(ulong*)(recordPtr + 8);
+                                            parentFrn = *(ulong*)(recordPtr + 16);
+                                            fileNameLength = *(ushort*)(recordPtr + 56);
+                                            fileNameOffset = *(ushort*)(recordPtr + 58);
+                                            validRecord = true;
+                                        }
+                                        else if (majorVersion == 3 && recordLength >= 76)
+                                        {
+                                            frn = *(ulong*)(recordPtr + 8);
+                                            parentFrn = *(ulong*)(recordPtr + 24);
+                                            fileNameLength = *(ushort*)(recordPtr + 72);
+                                            fileNameOffset = *(ushort*)(recordPtr + 74);
+                                            validRecord = true;
+                                        }
+
+                                        if (validRecord && fileNameOffset + fileNameLength <= recordLength)
                                         {
                                             // Fast string creation using ReadOnlySpan and unsafe code
                                             var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
