@@ -1,0 +1,10 @@
+--- Tachyon.Tests/Tachyon.Tests.csproj
++++ Tachyon.Tests/Tachyon.Tests.csproj
+@@ -25,5 +25,6 @@
+     <Compile Include="..\MftSearchWpf\Services\MftEngine.cs" Link="Services\MftEngine.cs" />
+     <Compile Include="..\MftSearchWpf\Services\ISystemIdentity.cs" Link="Services\ISystemIdentity.cs" />
+     <Compile Include="..\MftSearchWpf\Models\FileRecord.cs" Link="Models\FileRecord.cs" />
++    <Compile Include="..\Shared\MftRecordParser.cs" Link="Shared\MftRecordParser.cs" />
+   </ItemGroup>
+
+ </Project>

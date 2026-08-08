@@ -73,16 +73,14 @@ namespace MftSearchWpf.Services
             public string Name;
         }
 
-        public static bool IsAdministrator()
+        public static bool IsAdministrator(ISystemIdentity? identity = null)
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            var systemIdentity = identity ?? new SystemIdentity();
+
+            if (!systemIdentity.IsWindowsOS())
                 return false;
 
-#pragma warning disable CA1416
-            using WindowsIdentity identity = WindowsIdentity.GetCurrent();
-            WindowsPrincipal principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-#pragma warning restore CA1416
+            return systemIdentity.IsAdministratorRole();
         }
 
         public static async Task<List<Models.FileRecord>> BuildIndexAsync()
@@ -206,33 +204,41 @@ namespace MftSearchWpf.Services
                             byte* ptr = (byte*)pBuffer.ToPointer();
                             int offset = 8;
 
-                            while (offset < bytesReturned)
+                            while (offset + 4 <= bytesReturned)
                             {
                                 byte* recordPtr = ptr + offset;
                                 uint recordLength = *(uint*)recordPtr;
-                                if (recordLength == 0) break;
 
-                                ushort majorVersion = *(ushort*)(recordPtr + 4);
+                                if (recordLength == 0 || offset + recordLength > bytesReturned) break;
 
-                                if (majorVersion == 2 || majorVersion == 3)
+                                if (recordLength >= 6) // Ensure we can safely read MajorVersion
                                 {
-                                    MftSearch.Shared.MftRecordParser.ParseRecordFields(
-                                        recordPtr,
-                                        majorVersion,
-                                        out ulong frn,
-                                        out ulong parentFrn,
-                                        out ushort fileNameLength,
-                                        out ushort fileNameOffset);
+                                    ushort majorVersion = *(ushort*)(recordPtr + 4);
 
-                                    // Fast string creation using ReadOnlySpan and unsafe code
-                                    var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
-                                    string fileName = new string(span);
-
-                                    index[frn] = new RawFileEntry
+                                    if (majorVersion == 2 || majorVersion == 3)
                                     {
-                                        Name = fileName,
-                                        ParentFrn = parentFrn
-                                    };
+                                        bool validRecord = MftSearch.Shared.MftRecordParser.ParseRecordFields(
+                                            recordPtr,
+                                            recordLength,
+                                            majorVersion,
+                                            out ulong frn,
+                                            out ulong parentFrn,
+                                            out ushort fileNameLength,
+                                            out ushort fileNameOffset);
+
+                                        if (validRecord)
+                                        {
+                                            // Fast string creation using ReadOnlySpan and unsafe code
+                                            var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
+                                            string fileName = new string(span);
+
+                                            index[frn] = new RawFileEntry
+                                            {
+                                                Name = fileName,
+                                                ParentFrn = parentFrn
+                                            };
+                                        }
+                                    }
                                 }
                                 offset += (int)recordLength;
                             }

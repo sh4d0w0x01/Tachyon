@@ -273,36 +273,42 @@ namespace MftSearch
                             byte* ptr = (byte*)pBuffer.ToPointer();
                             int offset = 8;
 
-                            while (offset < bytesReturned)
+                            while (offset + 4 <= bytesReturned)
                             {
                                 byte* recordPtr = ptr + offset;
                                 uint recordLength = *(uint*)recordPtr;
-                                if (recordLength == 0) break;
+                                if (recordLength == 0 || offset + recordLength > bytesReturned) break;
 
-                                ushort majorVersion = *(ushort*)(recordPtr + 4);
-
-                                if (majorVersion == 2 || majorVersion == 3)
+                                if (recordLength >= 6) // Ensure we can safely read MajorVersion
                                 {
-                                    MftSearch.Shared.MftRecordParser.ParseRecordFields(
-                                        recordPtr,
-                                        majorVersion,
-                                        out ulong frn,
-                                        out ulong parentFrn,
-                                        out ushort fileNameLength,
-                                        out ushort fileNameOffset);
+                                    ushort majorVersion = *(ushort*)(recordPtr + 4);
 
-                                    // Fast string creation using ReadOnlySpan and unsafe code
-                                    var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
-                                    string fileName = new string(span);
-
-                                    // Add to dictionary map
-                                    index[frn] = new FileEntry
+                                    if (majorVersion == 2 || majorVersion == 3)
                                     {
-                                        Name = fileName,
-                                        ParentFrn = parentFrn
-                                    };
-                                }
+                                        bool validRecord = MftSearch.Shared.MftRecordParser.ParseRecordFields(
+                                            recordPtr,
+                                            recordLength,
+                                            majorVersion,
+                                            out ulong frn,
+                                            out ulong parentFrn,
+                                            out ushort fileNameLength,
+                                            out ushort fileNameOffset);
 
+                                        if (validRecord)
+                                        {
+                                            // Fast string creation using ReadOnlySpan and unsafe code
+                                            var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
+                                            string fileName = new string(span);
+
+                                            // Add to dictionary map
+                                            index[frn] = new FileEntry
+                                            {
+                                                Name = fileName,
+                                                ParentFrn = parentFrn
+                                            };
+                                        }
+                                    }
+                                }
                                 offset += (int)recordLength;
                             }
                         }
