@@ -211,8 +211,6 @@ namespace MftSearchWpf.Services
 
                                 if (recordLength == 0 || offset + recordLength > bytesReturned) break;
 
-                                if (recordLength < 60) break;
-
                                 if (recordLength >= 6) // Ensure we can safely read MajorVersion
                                 {
                                     ushort majorVersion = *(ushort*)(recordPtr + 4);
