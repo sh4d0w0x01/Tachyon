@@ -229,8 +229,10 @@ namespace MftSearch
                 IntPtr pEnumData = Marshal.AllocHGlobal(enumDataSize);
                 Marshal.StructureToPtr(enumData, pEnumData, false);
 
-                // Buffer for receiving USN records (typically 64KB is a good size, we use 64KB here)
-                int bufferSize = 64 * 1024;
+                // Buffer for receiving USN records.
+                // We use a larger buffer size (1MB) to reduce the number of DeviceIoControl kernel calls
+                // which significantly improves MFT parsing performance by reducing context switching overhead.
+                int bufferSize = 1024 * 1024;
                 IntPtr pBuffer = Marshal.AllocHGlobal(bufferSize);
 
                 try
