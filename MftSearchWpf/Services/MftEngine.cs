@@ -209,8 +209,9 @@ namespace MftSearchWpf.Services
                                 byte* recordPtr = ptr + offset;
                                 uint recordLength = *(uint*)recordPtr;
 
+                                if (recordLength == 0 || offset + recordLength > bytesReturned) break;
+
                                 if (recordLength < 60) break;
-                                if (offset + recordLength > bytesReturned) break;
 
                                 if (recordLength >= 6) // Ensure we can safely read MajorVersion
                                 {
