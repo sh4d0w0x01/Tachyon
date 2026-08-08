@@ -73,16 +73,14 @@ namespace MftSearchWpf.Services
             public string Name;
         }
 
-        public static bool IsAdministrator()
+        public static bool IsAdministrator(ISystemIdentity? identity = null)
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            var systemIdentity = identity ?? new SystemIdentity();
+
+            if (!systemIdentity.IsWindowsOS())
                 return false;
 
-#pragma warning disable CA1416
-            using WindowsIdentity identity = WindowsIdentity.GetCurrent();
-            WindowsPrincipal principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-#pragma warning restore CA1416
+            return systemIdentity.IsAdministratorRole();
         }
 
         public static async Task<List<Models.FileRecord>> BuildIndexAsync()
@@ -206,59 +204,55 @@ namespace MftSearchWpf.Services
                             byte* ptr = (byte*)pBuffer.ToPointer();
                             int offset = 8;
 
-                            while (offset < bytesReturned)
+                            while (offset + 4 <= bytesReturned)
                             {
-                                if (offset + 4 > bytesReturned) break;
-
                                 byte* recordPtr = ptr + offset;
                                 uint recordLength = *(uint*)recordPtr;
 
                                 if (recordLength < 60) break;
                                 if (offset + recordLength > bytesReturned) break;
 
-                                ushort majorVersion = *(ushort*)(recordPtr + 4);
-
-                                if (majorVersion == 2 || majorVersion == 3)
+                                if (recordLength >= 6) // Ensure we can safely read MajorVersion
                                 {
-                                    ulong frn = 0;
-                                    ulong parentFrn = 0;
-                                    ushort fileNameLength = 0;
-                                    ushort fileNameOffset = 0;
-                                    bool validRecord = true;
+                                    ushort majorVersion = *(ushort*)(recordPtr + 4);
 
-                                    if (majorVersion == 2)
+                                    if (majorVersion == 2 || majorVersion == 3)
                                     {
-                                        frn = *(ulong*)(recordPtr + 8);
-                                        parentFrn = *(ulong*)(recordPtr + 16);
-                                        fileNameLength = *(ushort*)(recordPtr + 56);
-                                        fileNameOffset = *(ushort*)(recordPtr + 58);
-                                    }
-                                    else if (majorVersion == 3)
-                                    {
-                                        if (recordLength >= 76)
+                                        ulong frn = 0;
+                                        ulong parentFrn = 0;
+                                        ushort fileNameLength = 0;
+                                        ushort fileNameOffset = 0;
+                                        bool validRecord = false;
+
+                                        if (majorVersion == 2 && recordLength >= 60)
+                                        {
+                                            frn = *(ulong*)(recordPtr + 8);
+                                            parentFrn = *(ulong*)(recordPtr + 16);
+                                            fileNameLength = *(ushort*)(recordPtr + 56);
+                                            fileNameOffset = *(ushort*)(recordPtr + 58);
+                                            validRecord = true;
+                                        }
+                                        else if (majorVersion == 3 && recordLength >= 76)
                                         {
                                             frn = *(ulong*)(recordPtr + 8);
                                             parentFrn = *(ulong*)(recordPtr + 24);
                                             fileNameLength = *(ushort*)(recordPtr + 72);
                                             fileNameOffset = *(ushort*)(recordPtr + 74);
+                                            validRecord = true;
                                         }
-                                        else
+
+                                        if (validRecord && fileNameOffset + fileNameLength <= recordLength)
                                         {
-                                            validRecord = false;
+                                            // Fast string creation using ReadOnlySpan and unsafe code
+                                            var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
+                                            string fileName = new string(span);
+
+                                            index[frn] = new RawFileEntry
+                                            {
+                                                Name = fileName,
+                                                ParentFrn = parentFrn
+                                            };
                                         }
-                                    }
-
-                                    if (validRecord && fileNameOffset + fileNameLength <= recordLength)
-                                    {
-                                        // Fast string creation using ReadOnlySpan and unsafe code
-                                        var span = new ReadOnlySpan<char>(recordPtr + fileNameOffset, fileNameLength / 2);
-                                        string fileName = new string(span);
-
-                                        index[frn] = new RawFileEntry
-                                        {
-                                            Name = fileName,
-                                            ParentFrn = parentFrn
-                                        };
                                     }
                                 }
                                 offset += (int)recordLength;
