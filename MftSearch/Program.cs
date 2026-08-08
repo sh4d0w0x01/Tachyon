@@ -165,7 +165,9 @@ namespace MftSearch
 
         private static Dictionary<ulong, FileEntry>? BuildIndexForDrive(string driveLetter)
         {
-            Dictionary<ulong, FileEntry> index = new Dictionary<ulong, FileEntry>();
+            // Pre-allocate dictionary capacity to avoid expensive resizing operations.
+            // A typical NTFS volume often contains hundreds of thousands of files.
+            Dictionary<ulong, FileEntry> index = new Dictionary<ulong, FileEntry>(1000000);
 
             // E.g., C:\ -> \\.\C:
             string volumePath = "\\\\.\\" + driveLetter.TrimEnd('\\');
