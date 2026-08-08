@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:MftSearchWpf"
         xmlns:vm="clr-namespace:MftSearchWpf.ViewModels"
         mc:Ignorable="d"
+        Name="RootWindow"
         Title="Tachyon" Height="600" Width="900"
         Background="#1e1e1e" Foreground="White" WindowStartupLocation="CenterScreen">
 
@@ -44,6 +45,36 @@
                 <Style TargetType="ListViewItem">
                     <Setter Property="Background" Value="Transparent" />
                     <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="Foreground" Value="LightGray" />
+                    <!-- Bind the DataContext of the Window to the Tag so the ContextMenu can access it -->
+                    <Setter Property="Tag" Value="{Binding DataContext, ElementName=RootWindow}" />
+                    <Setter Property="ContextMenu">
+                        <Setter.Value>
+                            <ContextMenu>
+                                <MenuItem Header="Copy Full Path"
+                                          Command="{Binding PlacementTarget.Tag.CopyPathCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}" />
+                                <MenuItem Header="Open File Location"
+                                          Command="{Binding PlacementTarget.Tag.OpenLocationCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}" />
+                                <Separator />
+                                <MenuItem Header="Calculate SHA256 &#38; Copy"
+                                          Command="{Binding PlacementTarget.Tag.CopyHashCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}" />
+                                <MenuItem Header="Check VirusTotal"
+                                          Command="{Binding PlacementTarget.Tag.CheckVirusTotalCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}" />
+                            </ContextMenu>
+                        </Setter.Value>
+                    </Setter>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="Black" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="Black" />
+                        </Trigger>
+                    </Style.Triggers>
                 </Style>
             </ListView.ItemContainerStyle>
         </ListView>
