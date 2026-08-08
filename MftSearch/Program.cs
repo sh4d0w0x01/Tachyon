@@ -271,7 +271,8 @@ namespace MftSearch
                         int offset = 8;
                         while (offset + 4 <= bytesReturned)
                         {
-                            IntPtr pRecord = new IntPtr(pBuffer.ToInt64() + offset);
+                            byte* ptr = (byte*)pBuffer.ToPointer();
+                            int offset = 8;
 
                             // Read RecordLength
                             uint recordLength = (uint)Marshal.ReadInt32(pRecord);
@@ -324,8 +325,6 @@ namespace MftSearch
                                     }
                                 }
                             }
-
-                            offset += (int)recordLength;
                         }
                     }
                 }
