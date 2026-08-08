@@ -97,7 +97,7 @@ namespace MftSearchWpf.ViewModels
                 // Ensure the UI collection remains empty on startup
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    FilteredRecords.Clear();
+                    FilteredRecords = new ObservableCollection<FileRecord>();
                 });
             }
             catch (Exception ex)
@@ -124,7 +124,7 @@ namespace MftSearchWpf.ViewModels
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    FilteredRecords.Clear();
+                    FilteredRecords = new ObservableCollection<FileRecord>();
                 });
                 return;
             }
@@ -142,14 +142,10 @@ namespace MftSearchWpf.ViewModels
 
                 if (!token.IsCancellationRequested)
                 {
-                    // Push those 200 results into the ObservableCollection using the UI Dispatcher
+                    // Re-instantiate the ObservableCollection on the UI thread to trigger only a single PropertyChanged event
                     Application.Current.Dispatcher.Invoke(() =>
                     {
-                        FilteredRecords.Clear();
-                        foreach (var record in results)
-                        {
-                            FilteredRecords.Add(record);
-                        }
+                        FilteredRecords = new ObservableCollection<FileRecord>(results);
                     });
                 }
             }
