@@ -134,10 +134,20 @@ namespace MftSearchWpf.ViewModels
                 // 3. Filter on Demand: Run filter on a background thread
                 var results = await Task.Run(() =>
                 {
-                    return _allRecords
-                        .Where(r => r.FileName.Contains(query, StringComparison.OrdinalIgnoreCase))
-                        .Take(200) // Take only the first 200 matches
-                        .ToList();
+                    var matchedRecords = new List<FileRecord>(200);
+                    foreach (var r in _allRecords)
+                    {
+                        if (token.IsCancellationRequested)
+                            token.ThrowIfCancellationRequested();
+
+                        if (r.FileName.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchedRecords.Add(r);
+                            if (matchedRecords.Count >= 200) // Take only the first 200 matches
+                                break;
+                        }
+                    }
+                    return matchedRecords;
                 }, token);
 
                 if (!token.IsCancellationRequested)
