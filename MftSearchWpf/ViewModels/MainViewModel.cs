@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using MftSearchWpf.Models;
 using MftSearchWpf.Services;
 
@@ -24,6 +27,11 @@ namespace MftSearchWpf.ViewModels
         private bool _isBusy = true;
         private CancellationTokenSource? _searchCts;
 
+        public ICommand CopyPathCommand { get; } = null!;
+        public ICommand OpenLocationCommand { get; } = null!;
+        public ICommand CopyHashCommand { get; } = null!;
+        public ICommand CheckVirusTotalCommand { get; } = null!;
+
         public MainViewModel()
         {
             if (!MftEngine.IsAdministrator())
@@ -32,6 +40,11 @@ namespace MftSearchWpf.ViewModels
                 Application.Current.Shutdown();
                 return;
             }
+
+            CopyPathCommand = new RelayCommand<FileRecord>(ExecuteCopyPath);
+            OpenLocationCommand = new RelayCommand<FileRecord>(ExecuteOpenLocation);
+            CopyHashCommand = new RelayCommand<FileRecord>(ExecuteCopyHash);
+            CheckVirusTotalCommand = new RelayCommand<FileRecord>(ExecuteCheckVirusTotal);
 
             // Start background indexing
             _ = InitializeMftAsync();
@@ -144,6 +157,93 @@ namespace MftSearchWpf.ViewModels
             {
                 // Expected when typing fast
             }
+        }
+
+        private void ExecuteCopyPath(FileRecord record)
+        {
+            if (record != null && !string.IsNullOrEmpty(record.FullPath))
+            {
+                Clipboard.SetText(record.FullPath);
+                StatusText = "Path copied to clipboard.";
+            }
+        }
+
+        private void ExecuteOpenLocation(FileRecord record)
+        {
+            if (record != null && !string.IsNullOrEmpty(record.FullPath))
+            {
+                try
+                {
+                    // Wrap the path in quotes and use /select to securely open Explorer without executing the file
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"/select,\"{record.FullPath}\"",
+                        UseShellExecute = false
+                    });
+                }
+                catch (Exception ex)
+                {
+                    StatusText = $"Failed to open location: {ex.Message}";
+                }
+            }
+        }
+
+        private async void ExecuteCopyHash(FileRecord record)
+        {
+            if (record != null && !string.IsNullOrEmpty(record.FullPath))
+            {
+                try
+                {
+                    StatusText = "Calculating SHA256...";
+                    string hash = await CalculateSha256Async(record.FullPath);
+                    Clipboard.SetText(hash);
+                    StatusText = "SHA256 copied to clipboard.";
+                }
+                catch (Exception ex)
+                {
+                    StatusText = $"Hash failed: {ex.Message}";
+                }
+            }
+        }
+
+        private async void ExecuteCheckVirusTotal(FileRecord record)
+        {
+            if (record != null && !string.IsNullOrEmpty(record.FullPath))
+            {
+                try
+                {
+                    StatusText = "Calculating SHA256 for VirusTotal...";
+                    string hash = await CalculateSha256Async(record.FullPath);
+                    string url = $"https://www.virustotal.com/gui/search/{hash}";
+
+                    // Safely open the browser
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = url,
+                        UseShellExecute = true
+                    });
+                    StatusText = "Opened VirusTotal in browser.";
+                }
+                catch (Exception ex)
+                {
+                    StatusText = $"VirusTotal check failed: {ex.Message}";
+                }
+            }
+        }
+
+        private Task<string> CalculateSha256Async(string filePath)
+        {
+            return Task.Run(() =>
+            {
+                // Safely read file bytes without locking it
+                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sha256 = SHA256.Create())
+                {
+                    var hashBytes = sha256.ComputeHash(stream);
+                    return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                }
+            });
         }
     }
 }
