@@ -5,8 +5,8 @@ namespace MftSearchWpf.Models
         public string FileName { get; set; } = string.Empty;
         public string FullPath { get; set; } = string.Empty;
 
-        // You could add size or other properties here, but MFT USN journal
-        // primarily gives FRN, ParentFRN, and FileName.
-        // Size requires querying the MFT record details which slows down indexing significantly.
+        public long Size { get; set; } = 0;
+        public string Extension { get; set; } = string.Empty;
+        public System.DateTime? DateModified { get; set; }
     }
 }
