@@ -178,6 +178,14 @@ namespace MftSearchWpf.ViewModels
         {
             if (record != null && !string.IsNullOrEmpty(record.FullPath))
             {
+                // Security Fix: Prevent command injection by validating that the path
+                // doesn't contain a double quote, which is invalid in Windows paths.
+                if (record.FullPath.Contains("\""))
+                {
+                    StatusText = "Failed to open location: Invalid path format.";
+                    return;
+                }
+
                 try
                 {
                     // Wrap the path in quotes and use /select to securely open Explorer without executing the file
