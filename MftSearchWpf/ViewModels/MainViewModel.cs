@@ -14,6 +14,15 @@ using MftSearchWpf.Services;
 
 namespace MftSearchWpf.ViewModels
 {
+    public enum FilterCategory
+    {
+        All,
+        Executables,
+        Scripts,
+        Archives,
+        Logs
+    }
+
     public class MainViewModel : ViewModelBase
     {
         // 1. Decouple the Data: Store millions of records here, NOT bound to UI
@@ -25,12 +34,15 @@ namespace MftSearchWpf.ViewModels
         private string _searchQuery = string.Empty;
         private string _statusText = "Initializing...";
         private bool _isBusy = true;
+        private int _totalFiles = 0;
+        private FilterCategory _currentFilter = FilterCategory.All;
         private CancellationTokenSource? _searchCts;
 
         public ICommand CopyPathCommand { get; } = null!;
         public ICommand OpenLocationCommand { get; } = null!;
         public ICommand CopyHashCommand { get; } = null!;
         public ICommand CheckVirusTotalCommand { get; } = null!;
+        public ICommand ClearSearchCommand { get; } = null!;
 
         public MainViewModel()
         {
@@ -45,6 +57,7 @@ namespace MftSearchWpf.ViewModels
             OpenLocationCommand = new RelayCommand<FileRecord>(ExecuteOpenLocation);
             CopyHashCommand = new RelayCommand<FileRecord>(ExecuteCopyHash);
             CheckVirusTotalCommand = new RelayCommand<FileRecord>(ExecuteCheckVirusTotal);
+            ClearSearchCommand = new RelayCommand<object>(_ => SearchQuery = string.Empty);
 
             // Start background indexing
             _ = InitializeMftAsync();
@@ -66,6 +79,24 @@ namespace MftSearchWpf.ViewModels
                     ExecuteSearchAsync(value);
                 }
             }
+        }
+
+        public FilterCategory CurrentFilter
+        {
+            get => _currentFilter;
+            set
+            {
+                if (SetProperty(ref _currentFilter, value))
+                {
+                    ExecuteSearchAsync(SearchQuery);
+                }
+            }
+        }
+
+        public int TotalFiles
+        {
+            get => _totalFiles;
+            set => SetProperty(ref _totalFiles, value);
         }
 
         public string StatusText
@@ -91,8 +122,9 @@ namespace MftSearchWpf.ViewModels
                 // Background task builds the List<FileRecord>
                 _allRecords = await MftEngine.BuildIndexAsync();
 
+                TotalFiles = _allRecords.Count;
                 sw.Stop();
-                StatusText = $"Indexed {_allRecords.Count:N0} files in {sw.ElapsedMilliseconds} ms. Ready.";
+                StatusText = $"Ready | {TotalFiles:N0} files indexed | Showing top 0 matches (Search time: 0 ms)";
 
                 // Ensure the UI collection remains empty on startup
                 Application.Current.Dispatcher.Invoke(() =>
@@ -120,14 +152,17 @@ namespace MftSearchWpf.ViewModels
             _searchCts = new CancellationTokenSource();
             var token = _searchCts.Token;
 
-            if (string.IsNullOrWhiteSpace(query))
+            if (string.IsNullOrWhiteSpace(query) && CurrentFilter == FilterCategory.All)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     FilteredRecords = new ObservableCollection<FileRecord>();
+                    StatusText = $"Ready | {TotalFiles:N0} files indexed | Showing top 0 matches (Search time: 0 ms)";
                 });
                 return;
             }
+
+            Stopwatch sw = Stopwatch.StartNew();
 
             try
             {
@@ -135,13 +170,50 @@ namespace MftSearchWpf.ViewModels
                 var results = await Task.Run(() =>
                 {
                     var matchedRecords = new List<FileRecord>(200);
+
+                    var extSet = GetFilterExtensions(CurrentFilter);
+                    bool hasExtFilter = extSet != null && extSet.Count > 0;
+                    bool hasQuery = !string.IsNullOrWhiteSpace(query);
+
                     foreach (var r in _allRecords)
                     {
                         if (token.IsCancellationRequested)
                             token.ThrowIfCancellationRequested();
 
-                        if (r.FileName.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        bool match = true;
+
+                        if (hasQuery && !r.FileName.Contains(query, StringComparison.OrdinalIgnoreCase))
                         {
+                            match = false;
+                        }
+
+                        if (match && hasExtFilter)
+                        {
+                            string ext = Path.GetExtension(r.FileName);
+                            if (!extSet.Contains(ext))
+                            {
+                                match = false;
+                            }
+                        }
+
+                        if (match)
+                        {
+                            // Fetch file info safely
+                            try
+                            {
+                                var fi = new FileInfo(r.FullPath);
+                                if (fi.Exists)
+                                {
+                                    r.Size = fi.Length;
+                                    r.DateModified = fi.LastWriteTime;
+                                    r.Extension = fi.Extension;
+                                }
+                            }
+                            catch
+                            {
+                                // Ignore if cannot read file info
+                            }
+
                             matchedRecords.Add(r);
                             if (matchedRecords.Count >= 200) // Take only the first 200 matches
                                 break;
@@ -150,12 +222,15 @@ namespace MftSearchWpf.ViewModels
                     return matchedRecords;
                 }, token);
 
+                sw.Stop();
+
                 if (!token.IsCancellationRequested)
                 {
                     // Re-instantiate the ObservableCollection on the UI thread to trigger only a single PropertyChanged event
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         FilteredRecords = new ObservableCollection<FileRecord>(results);
+                        StatusText = $"Ready | {TotalFiles:N0} files indexed | Showing top {results.Count} matches (Search time: {sw.ElapsedMilliseconds} ms)";
                     });
                 }
             }
@@ -163,6 +238,18 @@ namespace MftSearchWpf.ViewModels
             {
                 // Expected when typing fast
             }
+        }
+
+        private HashSet<string>? GetFilterExtensions(FilterCategory category)
+        {
+            return category switch
+            {
+                FilterCategory.Executables => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".exe", ".dll", ".sys" },
+                FilterCategory.Scripts => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".ps1", ".py", ".sh", ".bat" },
+                FilterCategory.Archives => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".zip", ".rar", ".7z", ".tar" },
+                FilterCategory.Logs => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".log", ".txt", ".json" },
+                _ => null
+            };
         }
 
         private void ExecuteCopyPath(FileRecord record)

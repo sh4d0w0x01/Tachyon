@@ -5,10 +5,49 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MftSearchWpf"
         xmlns:vm="clr-namespace:MftSearchWpf.ViewModels"
+        xmlns:conv="clr-namespace:MftSearchWpf.Converters"
         mc:Ignorable="d"
         Name="RootWindow"
         Title="Tachyon" Height="600" Width="900"
         Background="#1e1e1e" Foreground="White" WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <conv:FileSizeConverter x:Key="FileSizeConverter" />
+        <conv:StringNullOrEmptyToVisibilityConverter x:Key="StringNullOrEmptyToVisibilityConverter" />
+        <conv:EnumToBoolConverter x:Key="EnumToBoolConverter" />
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+
+        <Style x:Key="FilterChipStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="#333333" />
+            <Setter Property="Foreground" Value="LightGray" />
+            <Setter Property="BorderBrush" Value="#444444" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="Margin" Value="0,0,5,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Background" Value="#007acc" />
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="BorderBrush" Value="#007acc" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#444444" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
     <Window.DataContext>
         <vm:MainViewModel />
@@ -17,32 +56,93 @@
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Search Bar -->
-        <TextBox Grid.Row="0"
-                 Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
-                 FontSize="24" Padding="10" Margin="0,0,0,10"
-                 Background="#2d2d30" Foreground="White" BorderBrush="#3f3f46" BorderThickness="1"
-                 IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}, FallbackValue=True}"/>
+        <Border Grid.Row="0" Background="#2d2d30" BorderBrush="#3f3f46" BorderThickness="1" Margin="0,0,0,10" CornerRadius="4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Search Icon -->
+                <Path Grid.Column="0" Fill="#888888" Margin="10,0,5,0" VerticalAlignment="Center"
+                      Data="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+
+                <!-- Watermark -->
+                <TextBlock Grid.Column="1" Foreground="#666666" FontSize="20" Margin="5,10,10,10" VerticalAlignment="Center" IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                    <Run Text="Search " /><Run Text="{Binding TotalFiles, StringFormat={}{0:N0}}" /><Run Text=" files by name or extension..." />
+                </TextBlock>
+
+                <!-- Search Input -->
+                <TextBox x:Name="SearchBox" Grid.Column="1"
+                         Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                         FontSize="20" Padding="5,10" Background="Transparent" Foreground="White" BorderThickness="0"
+                         IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}, FallbackValue=True}"/>
+
+                <!-- Clear Button -->
+                <Button Grid.Column="2" Command="{Binding ClearSearchCommand}" Margin="5,0,10,0" VerticalAlignment="Center"
+                        Background="Transparent" BorderThickness="0"
+                        Visibility="{Binding SearchQuery, Converter={StaticResource StringNullOrEmptyToVisibilityConverter}}">
+                    <Path Fill="#888888" Data="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Filter Chips -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+            <RadioButton Content="All" Style="{StaticResource FilterChipStyle}"
+                         IsChecked="{Binding CurrentFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=All}" />
+            <RadioButton Content="Executables" Style="{StaticResource FilterChipStyle}"
+                         IsChecked="{Binding CurrentFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Executables}" />
+            <RadioButton Content="Scripts" Style="{StaticResource FilterChipStyle}"
+                         IsChecked="{Binding CurrentFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Scripts}" />
+            <RadioButton Content="Archives" Style="{StaticResource FilterChipStyle}"
+                         IsChecked="{Binding CurrentFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Archives}" />
+            <RadioButton Content="Logs" Style="{StaticResource FilterChipStyle}"
+                         IsChecked="{Binding CurrentFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Logs}" />
+        </StackPanel>
 
         <!-- Results View - Utilizing Virtualization -->
-        <ListView Grid.Row="1"
+        <DataGrid Grid.Row="2"
                   ItemsSource="{Binding FilteredRecords}"
+                  AutoGenerateColumns="False" IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="None"
                   Background="#1e1e1e" Foreground="LightGray"
                   BorderBrush="#3f3f46" BorderThickness="1"
+                  RowBackground="#1e1e1e" AlternatingRowBackground="#252526"
                   VirtualizingStackPanel.IsVirtualizing="True"
                   VirtualizingStackPanel.VirtualizationMode="Recycling">
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Header="Name" Width="250" DisplayMemberBinding="{Binding FileName}" />
-                    <GridViewColumn Header="Path" Width="600" DisplayMemberBinding="{Binding FullPath}" />
-                </GridView>
-            </ListView.View>
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
+
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="Background" Value="#252526" />
+                    <Setter Property="Foreground" Value="#CCCCCC" />
+                    <Setter Property="Padding" Value="10,5" />
+                    <Setter Property="BorderBrush" Value="#3f3f46" />
+                    <Setter Property="BorderThickness" Value="0,0,1,1" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
+
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
                     <Setter Property="Background" Value="Transparent" />
                     <Setter Property="BorderThickness" Value="0" />
                     <Setter Property="Foreground" Value="LightGray" />
@@ -69,18 +169,53 @@
                     </Setter>
                     <Style.Triggers>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Foreground" Value="Black" />
+                            <Setter Property="Background" Value="#007acc" />
+                            <Setter Property="Foreground" Value="White" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="Black" />
+                            <Setter Property="Background" Value="#3f3f46" />
+                            <Setter Property="Foreground" Value="White" />
                         </Trigger>
                     </Style.Triggers>
                 </Style>
-            </ListView.ItemContainerStyle>
-        </ListView>
+            </DataGrid.RowStyle>
+
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="*" />
+                <DataGridTextColumn Header="Path" Binding="{Binding FullPath}" Width="2*" />
+                <DataGridTextColumn Header="Size" Binding="{Binding Size, Converter={StaticResource FileSizeConverter}}" Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right" />
+                            <Setter Property="Margin" Value="0,0,10,0" />
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Extension" Binding="{Binding Extension}" Width="80">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Center" />
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Date Modified" Binding="{Binding DateModified, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="140">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right" />
+                            <Setter Property="Margin" Value="0,0,10,0" />
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
 
         <!-- Status Bar -->
-        <StatusBar Grid.Row="2" Background="#007acc" Foreground="White" Margin="0,10,0,0">
+        <StatusBar Grid.Row="3" Background="#007acc" Foreground="White" Margin="0,10,0,0">
+            <StatusBarItem>
+                <ProgressBar IsIndeterminate="True" Width="100" Height="15" Margin="0,0,10,0"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
+                             Value="0" />
+            </StatusBarItem>
             <StatusBarItem>
                 <TextBlock Text="{Binding StatusText}" />
             </StatusBarItem>
